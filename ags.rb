@@ -3,6 +3,8 @@
 module AGS
 
   require 'csv'
+  require 'json'
+  require 'zlib'
   require 'pp'
 
   # Read the GROUP attributes and create a hash of data arrays
@@ -48,10 +50,6 @@ module AGS
     tables
   end
 
-  # Parse a file and save it in an object for further processing
-  DATA_FILE = 'test_data/Example_AGS_file.txt'.freeze
-  ags_data = parse(DATA_FILE)
-
   # EXAMPLE to demonstrate the easy access via script without Database
   #
   # USE CASE: Search the data object for a specific data subset,
@@ -60,32 +58,47 @@ module AGS
   #
   # For example:
   # ./ags.rb dcpt loca_id WS05 dcpg_dpth
+  def self.search(ags_data, argv)
 
-  # Argument 0: GROUP name (lowercase)
-  group_name = ARGV[0].to_sym
-  # Argument 1: HEADING name (lowercase or uppercase)
-  heading_search = ARGV[1].upcase
-  # Argument 2: Search string (full text, also partials)
-  search_term = ARGV[2]
-  # Argument 4: HEADING name of the desired value
-  heading_target = ARGV[3].upcase
+    # Argument 0: GROUP name (lowercase)
+    group_name = argv[0]
+    # Argument 1: HEADING name (lowercase or uppercase)
+    heading_search = argv[1].upcase
+    # Argument 2: Search string (full text, also partials)
+    search_term = argv[2]
+    # Argument 4: HEADING name of the desired value
+    heading_target = argv[3].upcase
 
-  # select the group
-  group = ags_data[group_name]
-  # get the column numbers
-  search_column = group[:heading].index(heading_search)
-  target_column = group[:heading].index(heading_target) || 0
+    # select the group
+    group = ags_data[group_name]
+    # get the column numbers
+    search_column = group['heading'].index(heading_search)
+    target_column = group['heading'].index(heading_target) || 0
 
-  # Select all rows in which the column entry matches the search string,
-  # the result set is an array of row arrays containing strings.
-  result_set = group[:data].select { |row| row[search_column].include?(search_term) }
+    # Select all rows in which the column entry matches the search string,
+    # the result set is an array of row arrays containing strings.
+    result_set = group['data'].select { |row| row[search_column].include?(search_term) }
 
-  # TODO: Export csv sets like result_set.map { |row| row.to_csv } # (&:to_csv)
+    # TODO: Export csv sets like result_set.map { |row| row.to_csv } # (&:to_csv)
 
-  # Print search result in a nice way:
-  puts "No.  #{group[:heading]}, #{heading_target}"
-  result_set.each_with_index do |row, index|
-    puts "#{'%03d' % index}: #{row}, #{row[target_column]}"
+    # Print search result in a nice way:
+    puts "No.  #{group['heading']}, #{heading_target}"
+    result_set.each_with_index do |row, index|
+      puts "#{'%03d' % index}: #{row}, #{row[target_column]}"
+    end
+  end
+
+  # Parse a file and save it in an object for further processing
+  # DATA_FILE = 'test_data/Example_AGS_file.txt'.freeze
+  # ags_data = parse(DATA_FILE)
+
+  # Zlib::GzipWriter.open('test_data/ags_data.gz') do |gz|
+  #   gz.write ags_data.to_json
+  # end
+
+  Zlib::GzipReader.open('test_data/ags_data.gz') do |gz|
+    ags_data = JSON.parse(gz.read)
+    search(ags_data, ARGV)
   end
 
 end
